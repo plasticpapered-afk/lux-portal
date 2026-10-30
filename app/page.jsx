@@ -1,19 +1,22 @@
 import Link from 'next/link';
+import SiteHeader from '../components/SiteHeader';
+import SiteFooter from '../components/SiteFooter';
 
-export default function Home() {
+export const metadata = {
+  title: 'LUX Portal - apply and track your application',
+};
+
+export default function HomePage() {
   return (
     <main>
-      <div className="top">
-        <div className="brand"><span className="dot">LX</span> LUX PORTAL</div>
-        <Link className="tag" href="/admin">Staff</Link>
-      </div>
+      <SiteHeader />
 
-      <div className="hero">
+      <section className="hero">
         <div>
-          <div className="kicker">Applications and document review</div>
+          <p className="kicker">Applications and document review</p>
           <h1>One place to apply, upload documents and follow every step.</h1>
         </div>
-      </div>
+      </section>
 
       <div className="wrap">
         <section>
@@ -38,24 +41,20 @@ export default function Home() {
           <h2>Fees and refunds</h2>
           <p>
             Our service fee covers document checking, preparation and submission assistance. It is charged only
-            after we accept your case and you see the amount in writing in your service agreement.
+            after we accept your case, and you see the amount in writing in your service agreement.
           </p>
           <div className="note" style={{ marginTop: 12 }}>
-            The fee is <strong>refundable</strong> if we do not deliver the service set out in your agreement, or if
-            you cancel before we begin work. We do not sell jobs, and no visa, job offer or interview is guaranteed
-            by paying any fee. Fees never include government or embassy charges.
+            The fee is <span className="lime">refundable</span> if we do not deliver the agreed service. It is
+            never a payment for a job, and no employer has agreed to hire you until you hold a signed offer.
           </div>
         </section>
 
         <div className="actions">
           <Link className="btn btn-solid" href="/apply">Start an application</Link>
-          <Link className="btn btn-green" href="/status">Track my application</Link>
+          <Link className="btn btn-lime" href="/status">Track my application</Link>
         </div>
 
-        <div className="foot">
-          We are not a government body and we are not affiliated with any embassy or immigration authority.
-          Decisions on visas and jobs are made only by the relevant authorities and employers.
-        </div>
+        <SiteFooter />
       </div>
     </main>
   );
