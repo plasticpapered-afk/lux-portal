@@ -2,60 +2,72 @@ import Link from 'next/link';
 import SiteHeader from '../components/SiteHeader';
 import SiteFooter from '../components/SiteFooter';
 
-export const metadata = {
-  title: 'LUX Portal - apply and track your application',
-};
-
-export default function HomePage() {
+export default function Home() {
   return (
-    <main>
+    <>
       <SiteHeader />
+      <main className="wrap">
+        <section className="hero-big">
+          <span className="accent" />
+          <p className="kicker">Applications open</p>
+          <h1>Apply once. Upload once. Track everything.</h1>
+          <p className="sub">
+            Send your details and documents, get a reference number straight away, and follow every step from review to
+            decision. No queues, no chasing anyone on WhatsApp.
+          </p>
+          <div className="actions">
+            <Link className="btn btn-lime" href="/apply">Start application</Link>
+            <Link className="btn btn-ghost" href="/status">Track my application</Link>
+          </div>
+        </section>
 
-      <section className="hero">
-        <div>
-          <p className="kicker">Applications and document review</p>
-          <h1>One place to apply, upload documents and follow every step.</h1>
-        </div>
-      </section>
-
-      <div className="wrap">
         <section>
           <h2>How it works</h2>
           <div className="cards">
             <div className="card">
-              <h3>1. Apply and upload</h3>
-              <p>Send your details and documents once. You get a reference number immediately by email.</p>
+              <h3><span className="lime">01</span> Apply and upload</h3>
+              <p>Fill the form once and attach your passport, CV and certificates. You get a reference number by email.</p>
             </div>
             <div className="card">
-              <h3>2. Trained staff review</h3>
-              <p>Every document is checked by a reviewer before anything is submitted on your behalf.</p>
+              <h3><span className="lime">02</span> Document review</h3>
+              <p>Our review desk checks every document. If something is missing or unclear, we message you directly.</p>
             </div>
             <div className="card">
-              <h3>3. Follow your status</h3>
-              <p>Check progress any time with your reference and email. No need to chase anyone.</p>
+              <h3><span className="lime">03</span> Decision and next steps</h3>
+              <p>You are approved or declined in writing. Approved cases see the fee step and upload proof of payment.</p>
             </div>
           </div>
         </section>
 
         <section>
           <h2>Fees and refunds</h2>
-          <p>
-            Our service fee covers document checking, preparation and submission assistance. It is charged only
-            after we accept your case, and you see the amount in writing in your service agreement.
-          </p>
-          <div className="note" style={{ marginTop: 12 }}>
-            The fee is <span className="lime">refundable</span> if we do not deliver the agreed service. It is
-            never a payment for a job, and no employer has agreed to hire you until you hold a signed offer.
+          <div className="note-lime">
+            <p>
+              The service fee covers document checking, preparation and submission assistance. It is shown to you in
+              writing before you pay, and it is <span className="lime">refundable</span> if we do not deliver the agreed
+              service.
+            </p>
+            <p className="muted small" style={{ marginTop: 10 }}>
+              We never charge for a job offer, and no visa or placement is guaranteed. We are not a government body.
+            </p>
           </div>
         </section>
 
-        <div className="actions">
-          <Link className="btn btn-solid" href="/apply">Start an application</Link>
-          <Link className="btn btn-lime" href="/status">Track my application</Link>
-        </div>
+        <section>
+          <h2>What to prepare</h2>
+          <div className="cards">
+            <div className="card"><h3>Passport</h3><p className="small">Photo page, valid for at least two years.</p></div>
+            <div className="card"><h3>CV</h3><p className="small">One or two pages, with your contact details.</p></div>
+            <div className="card"><h3>Certificates</h3><p className="small">Academic results and any language test.</p></div>
+          </div>
+        </section>
 
-        <SiteFooter />
-      </div>
-    </main>
+        <section className="actions" style={{ paddingBottom: 40 }}>
+          <Link className="btn btn-lime" href="/apply">Start application</Link>
+          <Link className="btn btn-ghost" href="/status">Where is my application?</Link>
+        </section>
+      </main>
+      <SiteFooter />
+    </>
   );
 }
