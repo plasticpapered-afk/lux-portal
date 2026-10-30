@@ -1,75 +1,72 @@
 import { NextResponse } from 'next/server';
-import { db, ensureSchema } from '../../../lib/db';
-import { sendMail, applicantReceived, staffAlert, STAFF_INBOX } from '../../../lib/mail';
+import { put } from '@vercel/blob';
+import { createApplicant, addDocument, mode } from '../../../lib/store';
+import { sendMail, applicantReceived } from '../../../lib/mail';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-function ref() {
-  const s = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let out = 'LUX-';
-  for (let i = 0; i < 6; i += 1) out += s[Math.floor(Math.random() * s.length)];
-  return out;
-}
-
-async function storeFile(kind, filename, dataUrl) {
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (token) {
-    const { put } = await import('@vercel/blob');
-    const base64 = (dataUrl.split(',')[1] || '');
-    const buf = Buffer.from(base64, 'base64');
-    const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const blob = await put(`applicants/${Date.now()}-${safe}`, buf, {
-      access: 'public',
-      token,
-      contentType: dataUrl.slice(5).split(';')[0] || 'application/octet-stream',
-    });
-    return blob.url;
-  }
-  return dataUrl.length < 1_600_000 ? dataUrl : null;
+function decodeUpload(doc) {
+  const name = String(doc?.filename || 'file');
+  const dataUrl = String(doc?.data || '');
+  const comma = dataUrl.indexOf(',');
+  const b64 = comma >= 0 ? dataUrl.slice(comma + 1) : '';
+  return { name, buffer: Buffer.from(b64, 'base64') };
 }
 
 export async function POST(req) {
   try {
-    await ensureSchema();
-    const sql = db();
     const body = await req.json();
-
-    const fullName = String(body.full_name || '').trim();
+    const full_name = String(body.full_name || '').trim();
     const email = String(body.email || '').trim().toLowerCase();
-    if (fullName.length < 3) return NextResponse.json({ error: 'Please enter your full name.' }, { status: 400 });
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 });
-    if (!body.fee_ack) return NextResponse.json({ error: 'Please confirm you understand the fee terms.' }, { status: 400 });
-
-    const reference = ref();
-    const rows = await sql`
-      INSERT INTO applicants (ref, full_name, email, phone, country, service, notes, fee_ack)
-      VALUES (${reference}, ${fullName}, ${email}, ${body.phone || null}, ${body.country || null},
-              ${body.service || null}, ${body.notes || null}, true)
-      RETURNING id, ref`;
-
-    const applicant = rows[0];
-
-    const docs = Array.isArray(body.docs) ? body.docs.slice(0, 6) : [];
-    for (const doc of docs) {
-      if (!doc || !doc.dataUrl) continue;
-      const url = await storeFile(doc.kind || 'document', doc.filename || 'file', doc.dataUrl);
-      if (!url) continue;
-      await sql`INSERT INTO documents (applicant_id, kind, filename, url)
-                VALUES (${applicant.id}, ${doc.kind || 'document'}, ${doc.filename || null}, ${url})`;
+    if (!full_name || !email) {
+      return NextResponse.json({ error: 'Name and email are required.' }, { status: 400 });
+    }
+    if (!body.fee_ack) {
+      return NextResponse.json({ error: 'Please confirm you have read the fee and refund terms.' }, { status: 400 });
     }
 
-    await sql`INSERT INTO status_events (applicant_id, status, note, actor)
-              VALUES (${applicant.id}, 'received', 'Application submitted', 'system')`;
+    const applicant = await createApplicant({
+      full_name,
+      email,
+      phone: body.phone || null,
+      country: body.country || null,
+      service: body.service || null,
+      notes: body.notes || null,
+      fee_ack: true,
+    });
 
-    const mail = applicantReceived({ name: fullName, ref: reference });
+    const docs = Array.isArray(body.documents) ? body.documents : [];
+    for (const doc of docs.slice(0, 4)) {
+      if (!doc?.data) continue;
+      const { name, buffer } = decodeUpload(doc);
+      let url = null;
+      if (process.env.BLOB_READ_WRITE_TOKEN) {
+        try {
+          const blob = await put(`applicants/${applicant.ref}/${doc.kind || 'doc'}-${name}`, buffer, {
+            access: 'public',
+            token: process.env.BLOB_READ_WRITE_TOKEN,
+          });
+          url = blob.url;
+        } catch (err) {
+          console.error('[blob upload failed]', err?.message || err);
+        }
+      }
+      await addDocument(applicant.id, { kind: doc.kind || 'document', filename: name, url });
+    }
+
+    const mail = applicantReceived({ name: full_name, ref: applicant.ref });
     await sendMail({ to: email, subject: mail.subject, html: mail.html });
-    if (STAFF_INBOX) {
-      const alert = staffAlert({ name: fullName, ref: reference, email, service: body.service });
-      await sendMail({ to: STAFF_INBOX, subject: alert.subject, html: alert.html });
+    if (process.env.STAFF_INBOX) {
+      await sendMail({
+        to: process.env.STAFF_INBOX,
+        subject: `New application ${applicant.ref} - ${full_name}`,
+        html: `<p>New application received.</p><p>Reference: <strong>${applicant.ref}</strong><br/>Name: ${full_name}<br/>Email: ${email}<br/>Service: ${body.service || '-'}</p>`,
+      });
     }
 
-    return NextResponse.json({ ok: true, ref: reference });
+    return NextResponse.json({ ok: true, ref: applicant.ref, mode: mode() });
   } catch (err) {
-    return NextResponse.json({ error: 'Could not submit application.', detail: String(err?.message || err) }, { status: 500 });
+    return NextResponse.json({ error: 'Could not save the application.', detail: String(err?.message || err) }, { status: 500 });
   }
 }
