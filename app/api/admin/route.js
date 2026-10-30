@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { sign, session, STAFF_PASSWORD, HR_PASSWORD } from '../../../lib/auth';
-import { listApplicants, updateStatus, getApplicantById, logEvent, mode, listDocumentsFor } from '../../../lib/store';
+import { listApplicants, updateStatus, getApplicantById, logEvent, mode, listDocumentsFor, deleteApplicant } from '../../../lib/store';
 import { sendMail, applicantStatus } from '../../../lib/mail';
 
 export const runtime = 'nodejs';
@@ -11,7 +11,7 @@ function signIn(body) {
   const password = String(body.password || '');
   const expected = area === 'hr' ? HR_PASSWORD : STAFF_PASSWORD;
   if (password !== expected) {
-    return { error: 'Wrong password. The default is change-me.', status: 401 };
+    return { error: 'Wrong password for this desk.', status: 401 };
   }
   const token = sign({ area, role: area === 'hr' ? 'hr' : 'viewer', exp: Date.now() + 8 * 60 * 60 * 1000 });
   return { token, area };
@@ -20,6 +20,19 @@ function signIn(body) {
 export async function POST(req) {
   try {
     const body = await req.json();
+
+    if (body.action === 'delete') {
+      const s = session(req);
+      if (!s) return NextResponse.json({ error: 'Sign in required.' }, { status: 401 });
+      if (s.area !== 'hr' && s.area !== 'admin') {
+        return NextResponse.json({ error: 'Only the HR desk can delete applications.' }, { status: 403 });
+      }
+      const id = String(body.id || '');
+      const applicant = await getApplicantById(id);
+      if (!applicant) return NextResponse.json({ error: 'Applicant not found.' }, { status: 404 });
+      await deleteApplicant(id);
+      return NextResponse.json({ ok: true, deleted: applicant.ref });
+    }
 
     if (body.action === 'message') {
       const s = session(req);
