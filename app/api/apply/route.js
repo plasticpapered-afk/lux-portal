@@ -6,12 +6,12 @@ import { sendMail, applicantReceived } from '../../../lib/mail';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function decodeUpload(doc) {
-  const name = String(doc?.filename || 'file');
-  const dataUrl = String(doc?.data || '');
-  const comma = dataUrl.indexOf(',');
-  const b64 = comma >= 0 ? dataUrl.slice(comma + 1) : '';
-  return { name, buffer: Buffer.from(b64, 'base64') };
+const MAX_BYTES = 3 * 1024 * 1024;
+
+function decode(dataUrl) {
+  const comma = String(dataUrl || '').indexOf(',');
+  const b64 = comma >= 0 ? String(dataUrl).slice(comma + 1) : '';
+  return Buffer.from(b64, 'base64');
 }
 
 export async function POST(req) {
@@ -19,12 +19,31 @@ export async function POST(req) {
     const body = await req.json();
     const full_name = String(body.full_name || '').trim();
     const email = String(body.email || '').trim().toLowerCase();
+
     if (!full_name || !email) {
       return NextResponse.json({ error: 'Name and email are required.' }, { status: 400 });
     }
     if (!body.fee_ack) {
       return NextResponse.json({ error: 'Please confirm you have read the fee and refund terms.' }, { status: 400 });
     }
+
+    const scan = body.scan || null;
+    if (!scan?.data) {
+      return NextResponse.json({ error: 'Please attach one PDF containing all your scanned documents.' }, { status: 400 });
+    }
+
+    const filename = String(scan.filename || 'documents.pdf');
+    if (!/\.pdf$/i.test(filename)) {
+      return NextResponse.json({ error: 'Your scanned documents must be a single PDF file.' }, { status: 400 });
+    }
+
+    const buffer = decode(scan.data);
+    if (!buffer.length) return NextResponse.json({ error: 'The PDF arrived empty. Please try again.' }, { status: 400 });
+    if (buffer.length > MAX_BYTES) {
+      return NextResponse.json({ error: 'That PDF is bigger than 3 MB. Please compress it and try again.' }, { status: 400 });
+    }
+    const isPdf = buffer.slice(0, 5).toString() === '%PDF-';
+    if (!isPdf) return NextResponse.json({ error: 'That file is not a valid PDF.' }, { status: 400 });
 
     const applicant = await createApplicant({
       full_name,
@@ -36,37 +55,30 @@ export async function POST(req) {
       fee_ack: true,
     });
 
-    const docs = Array.isArray(body.documents) ? body.documents : [];
-    for (const doc of docs.slice(0, 4)) {
-      if (!doc?.data) continue;
-      const { name, buffer } = decodeUpload(doc);
-      let url = null;
-      if (process.env.BLOB_READ_WRITE_TOKEN) {
-        try {
-          const blob = await put(`applicants/${applicant.ref}/${doc.kind || 'doc'}-${name}`, buffer, {
-            access: 'public',
-            token: process.env.BLOB_READ_WRITE_TOKEN,
-          });
-          url = blob.url;
-        } catch (err) {
-          console.error('[blob upload failed]', err?.message || err);
-        }
+    // Keep the PDF where the HR desk can open it:
+    // Vercel Blob when configured, otherwise inside the database.
+    let url = null;
+    let data = null;
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      try {
+        const blob = await put(`applicants/${applicant.ref}/${filename}`, buffer, {
+          access: 'public',
+          token: process.env.BLOB_READ_WRITE_TOKEN,
+        });
+        url = blob.url;
+      } catch (err) {
+        console.error('[blob upload failed, using database]', err?.message || err);
       }
-      await addDocument(applicant.id, { kind: doc.kind || 'document', filename: name, url });
     }
+    if (!url) data = buffer.toString('base64');
 
-    const mail = applicantReceived({ name: full_name, ref: applicant.ref });
-    await sendMail({ to: email, subject: mail.subject, html: mail.html });
-    if (process.env.STAFF_INBOX) {
-      await sendMail({
-        to: process.env.STAFF_INBOX,
-        subject: `New application ${applicant.ref} - ${full_name}`,
-        html: `<p>New application received.</p><p>Reference: <strong>${applicant.ref}</strong><br/>Name: ${full_name}<br/>Email: ${email}<br/>Service: ${body.service || '-'}</p>`,
-      });
-    }
+    await addDocument(applicant.id, { kind: 'documents_pdf', filename, url, data });
 
-    return NextResponse.json({ ok: true, ref: applicant.ref, mode: mode() });
+    const mail = applicantReceived({ name: applicant.full_name, ref: applicant.ref });
+    await sendMail({ to: applicant.email, ...mail });
+
+    return NextResponse.json({ ok: true, ref: applicant.ref, mode: mode(), stored: url ? 'blob' : 'database' });
   } catch (err) {
-    return NextResponse.json({ error: 'Could not save the application.', detail: String(err?.message || err) }, { status: 500 });
+    return NextResponse.json({ error: 'Application failed.', detail: String(err?.message || err) }, { status: 500 });
   }
 }
