@@ -1,47 +1,39 @@
 # LUX Portal
 
-Applicant intake and staff review portal. Next.js on Vercel, Neon Postgres, Resend email, Vercel Blob storage.
+Applicant intake, document upload, staff back office with two passwords, status tracking, proof of payment, and emails.
 
-## Pages
-- `/` public overview, fee and refund disclosure
-- `/apply` application form with document upload, returns a reference number
-- `/status` applicant tracking by reference + email; after approval it shows the service fee step and proof upload
-- `/admin` staff sign in and back office: list applicants, add a note, change status
+## Why buttons failed before
 
-Two separate gates:
-- Back office password: `STAFF_PASSWORD` (default `change-me`)
-- HR review desk password: `HR_PASSWORD` (default `change-me`)
+If `DATABASE_URL` is missing the API returned an error and the back office stayed on the sign-in screen with no message. The app now runs in **demo mode** with sample applicants whenever `DATABASE_URL` is not set, so every button works immediately after deploy. Add a database later and it switches to Neon automatically.
 
-Both default to `change-me` as requested. Change them in Vercel before going live.
+## Structure
 
-## Setup
-1. Create a Neon project at https://neon.tech and copy the connection string.
-2. Run `sql/schema.sql` in the Neon SQL editor.
-3. Create a Resend account at https://resend.com, verify a sending domain, copy the API key.
-4. In Vercel import this repo, then add environment variables:
+app/                 routes only, thin
+components/          SiteHeader, SiteFooter, AdminLogin, AdminDashboard
+lib/store.js         one data layer, Neon when configured, in-memory demo otherwise
+lib/auth.js          signed cookie sessions, two desks
+lib/mail.js          Resend, silently skipped when no key
+sql/schema.sql       run once in Neon
 
-```
-DATABASE_URL=postgres://...
-RESEND_API_KEY=re_...
-MAIL_FROM=LUX Portal <no-reply@yourdomain.com>
-STAFF_INBOX=you@yourdomain.com
-STAFF_PASSWORD=change-me
-HR_PASSWORD=change-me
-STAFF_SECRET=any long random string
-BLOB_READ_WRITE_TOKEN=vercel_blob_rw_...
-```
+## Go live
 
-5. Deploy.
+1. Neon: create a project, run `sql/schema.sql` in the SQL editor
+2. Vercel: import the repo, add env vars, deploy
 
-## Notes
-- Without `RESEND_API_KEY` emails are logged and skipped, so the demo still works.
-- Without `BLOB_READ_WRITE_TOKEN` files up to 1.5 MB are stored inline in Postgres. Connect Blob for production.
-- Vercel Hobby is for non-commercial use. For a paying client, deploy to Vercel Pro or Cloudflare Pages.
-- Store only what you need. Delete documents after a decision and keep a written retention policy.
+Env vars:
 
-## Compliance reminders
-- Publish the fee in writing before work starts, and keep it refundable as described on the site.
-- Never promise a visa, job offer or interview in exchange for money.
-- Do not collect payment card details; only proof of payment.
-- Register the agency where required: Zimbabwe Ministry of Labour for recruitment, and check local rules in the destination country.
-- Handle passports and certificates as personal data: private storage, limited staff access, deletion on request.
+DATABASE_URL            Neon connection string (optional, demo mode without it)
+RESEND_API_KEY          emails
+MAIL_FROM               e.g. LUX Portal <hello@yourdomain.com>
+STAFF_INBOX             where new applications are announced
+STAFF_PASSWORD          admin/viewer desk password, default change-me
+HR_PASSWORD             HR review desk password, default change-me
+STAFF_SECRET            random string for cookie signing
+BLOB_READ_WRITE_TOKEN   optional, Vercel Blob for real file storage
+
+## Routes
+
+/          public page with fee and refund wording
+/apply     application form with document upload
+/status    track by reference and email, upload proof of payment after approval
+/admin     back office, both desks
