@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import SiteHeader from '../../components/SiteHeader';
 import SiteFooter from '../../components/SiteFooter';
+import { FEE_EUR, waLink, WHATSAPP_DISPLAY } from '../../lib/config';
 
 export default function StatusPage() {
   const [ref, setRef] = useState('');
@@ -117,7 +118,17 @@ export default function StatusPage() {
             {data.feeDue && (
               <section>
                 <h2>Service fee</h2>
-                <p>
+                <div className="fee-box">
+                  <div className="fee-amount">€{FEE_EUR}</div>
+                  <p className="muted small">Or the equivalent in your currency. Refundable if we do not deliver.</p>
+                  <p style={{ marginTop: 10 }}>
+                    <a className="btn btn-lime btn-sm" href={waLink(`Hello, my reference is ${data.applicant.ref}. Please send me the payment options for the EUR ${FEE_EUR} service fee.`)} target="_blank" rel="noreferrer">
+                      Get payment options on WhatsApp
+                    </a>
+                  </p>
+                  <p className="muted small" style={{ marginTop: 8 }}>WhatsApp {WHATSAPP_DISPLAY}</p>
+                </div>
+                <p style={{ marginTop: 12 }}>
                   Your application was approved. The service fee covers document preparation and submission
                   assistance. It is <span className="lime">refundable</span> if we do not deliver the agreed
                   service, and it is not a payment for a job.
