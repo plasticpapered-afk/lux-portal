@@ -1,6 +1,5 @@
 import Link from 'next/link';
-
-const WHATSAPP = 'https://wa.me/263787434880?text=Hello%20LUX%20Portal%2C%20I%20have%20a%20question%20about%20my%20application';
+import { WHATSAPP_DISPLAY, waLink, FEE_EUR } from '../lib/config';
 
 export default function SiteFooter() {
   return (
@@ -21,14 +20,16 @@ export default function SiteFooter() {
         </div>
         <div>
           <h4>Talk to us</h4>
-          <a href={WHATSAPP} target="_blank" rel="noreferrer">WhatsApp</a>
+          <a href={waLink()} target="_blank" rel="noreferrer">WhatsApp {WHATSAPP_DISPLAY}</a>
           <a href="mailto:hello@luxportal.example">Email</a>
+          <span className="muted small">Service fee: €{FEE_EUR}</span>
         </div>
       </div>
       <p className="muted small" style={{ paddingBottom: 26, lineHeight: 1.6 }}>
         We prepare and submit applications on your behalf. No job, visa or placement is guaranteed, and we are not a
-        government body. Our service fee is charged only under a written agreement and is refundable if we do not deliver
-        the agreed service.
+        government body. The €{FEE_EUR} service fee is charged only under a written agreement, is payable after your
+        case is approved, and is refundable if we do not deliver the agreed service. Payment options are shared on
+        WhatsApp.
       </p>
     </footer>
   );
