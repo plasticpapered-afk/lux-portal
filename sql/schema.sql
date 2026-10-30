@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS documents (
   kind text NOT NULL,
   filename text,
   url text,
+  data text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
