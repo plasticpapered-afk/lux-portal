@@ -1,25 +1,64 @@
 import { NextResponse } from 'next/server';
-import { sign, session, canReview, STAFF_PASSWORD, HR_PASSWORD } from '../../../lib/auth';
-import { listApplicants, updateStatus, mode } from '../../../lib/store';
+import { sign, session, STAFF_PASSWORD, HR_PASSWORD } from '../../../lib/auth';
+import { listApplicants, updateStatus, getApplicantById, logEvent, mode, listDocumentsFor } from '../../../lib/store';
 import { sendMail, applicantStatus } from '../../../lib/mail';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+function signIn(body) {
+  const area = body.area === 'hr' ? 'hr' : 'staff';
+  const password = String(body.password || '');
+  const expected = area === 'hr' ? HR_PASSWORD : STAFF_PASSWORD;
+  if (password !== expected) {
+    return { error: 'Wrong password. The default is change-me.', status: 401 };
+  }
+  const token = sign({ area, role: area === 'hr' ? 'hr' : 'viewer', exp: Date.now() + 8 * 60 * 60 * 1000 });
+  return { token, area };
+}
+
 export async function POST(req) {
   try {
     const body = await req.json();
-    const area = body.area === 'hr' ? 'hr' : 'staff';
-    const password = String(body.password || '');
-    const expected = area === 'hr' ? HR_PASSWORD : STAFF_PASSWORD;
 
-    if (password !== expected) {
-      return NextResponse.json({ error: 'Wrong password. The default is change-me.' }, { status: 401 });
+    if (body.action === 'message') {
+      const s = session(req);
+      if (!s) return NextResponse.json({ error: 'Sign in required.' }, { status: 401 });
+      if (s.area !== 'hr' && s.area !== 'admin') {
+        return NextResponse.json({ error: 'Only the HR desk can message applicants.' }, { status: 403 });
+      }
+
+      const applicant = await getApplicantById(String(body.id || ''));
+      if (!applicant) return NextResponse.json({ error: 'Applicant not found.' }, { status: 404 });
+
+      const subject = String(body.subject || '').trim() || `Message about your application ${applicant.ref}`;
+      const text = String(body.body || '').trim();
+      if (!text) return NextResponse.json({ error: 'Write a message first.' }, { status: 400 });
+
+      const html = `<p>Hello ${applicant.full_name},</p>
+<p>${text.replace(/\n/g, '<br/>')}</p>
+<p>Your reference is <strong>${applicant.ref}</strong>.</p>
+<p>LUX Portal</p>`;
+
+      const result = await sendMail({ to: applicant.email, subject, html });
+      await logEvent(applicant.id, applicant.status, `Message sent to applicant: ${subject}`, 'hr');
+
+      return NextResponse.json({
+        ok: true,
+        emailed: !result?.skipped && !result?.error,
+        note: result?.skipped
+          ? 'Email skipped: add RESEND_API_KEY in Vercel to send real emails. The message was logged.'
+          : result?.error
+          ? `Email failed: ${result.error}`
+          : `Email sent to ${applicant.email}.`,
+      });
     }
 
-    const token = sign({ area, role: area === 'hr' ? 'hr' : 'viewer', exp: Date.now() + 8 * 60 * 60 * 1000 });
-    const res = NextResponse.json({ ok: true, area, mode: mode() });
-    res.cookies.set('lux_staff', token, {
+    const login = signIn(body);
+    if (login.error) return NextResponse.json({ error: login.error }, { status: login.status });
+
+    const res = NextResponse.json({ ok: true, area: login.area, mode: mode() });
+    res.cookies.set('lux_staff', login.token, {
       httpOnly: true,
       sameSite: 'lax',
       path: '/',
@@ -36,7 +75,18 @@ export async function GET(req) {
   if (!s) return NextResponse.json({ error: 'Sign in required.' }, { status: 401 });
   try {
     const applicants = await listApplicants();
-    return NextResponse.json({ ok: true, area: s.area, mode: mode(), applicants });
+    const withDocs = await Promise.all(
+      applicants.map(async (a) => ({
+        ...a,
+        documents: (await listDocumentsFor(a.id)).map((d) => ({
+          id: d.id,
+          kind: d.kind,
+          filename: d.filename,
+          viewable: Boolean(d.has_data ?? d.data ?? d.url),
+        })),
+      }))
+    );
+    return NextResponse.json({ ok: true, area: s.area, mode: mode(), applicants: withDocs });
   } catch (err) {
     return NextResponse.json({ error: 'Could not load applications.', detail: String(err?.message || err) }, { status: 500 });
   }
@@ -45,28 +95,19 @@ export async function GET(req) {
 export async function PATCH(req) {
   const s = session(req);
   if (!s) return NextResponse.json({ error: 'Sign in required.' }, { status: 401 });
-  const role = s.area === 'hr' ? 'hr' : s.role || 'viewer';
-  if (!canReview(role)) {
-    return NextResponse.json({ error: 'The admin desk cannot change review outcomes. Use the HR desk password.' }, { status: 403 });
+  if (s.area !== 'hr' && s.area !== 'admin') {
+    return NextResponse.json({ error: 'Only the HR desk can change a status.' }, { status: 403 });
   }
-
   try {
     const body = await req.json();
-    const id = String(body.id || '');
+    const applicant = await getApplicantById(String(body.id || ''));
+    if (!applicant) return NextResponse.json({ error: 'Applicant not found.' }, { status: 404 });
+
     const status = String(body.status || '');
-    const note = body.note ? String(body.note) : null;
-    const allowed = ['received', 'in_review', 'approved', 'declined', 'payment_submitted', 'completed'];
-    if (!id || !allowed.includes(status)) {
-      return NextResponse.json({ error: 'Invalid update.' }, { status: 400 });
-    }
-
-    const row = await updateStatus(id, status, note, role);
-    if (!row) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
-
-    const mail = applicantStatus({ name: row.full_name, ref: row.ref, status, note });
-    await sendMail({ to: row.email, subject: mail.subject, html: mail.html });
-
-    return NextResponse.json({ ok: true, applicant: row });
+    const note = String(body.note || '');
+    const updated = await updateStatus(applicant.id, status, note, s.area);
+    await sendMail({ to: applicant.email, ...applicantStatus({ name: applicant.full_name, ref: applicant.ref, status, note }) });
+    return NextResponse.json({ ok: true, applicant: updated });
   } catch (err) {
     return NextResponse.json({ error: 'Update failed.', detail: String(err?.message || err) }, { status: 500 });
   }
