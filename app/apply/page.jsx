@@ -1,83 +1,91 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import SiteHeader from '../../components/SiteHeader';
+import SiteFooter from '../../components/SiteFooter';
 
 const FIELDS = [
-  ['full_name', 'Full name'],
-  ['email', 'Email address'],
-  ['phone', 'Phone number'],
-  ['country', 'Country'],
+  { name: 'full_name', label: 'Full name', placeholder: 'As written in your passport' },
+  { name: 'email', label: 'Email', placeholder: 'you@example.com', type: 'email' },
+  { name: 'phone', label: 'Phone', placeholder: '+263 ...' },
+  { name: 'country', label: 'Country', placeholder: 'Zimbabwe' },
 ];
 
-export default function Apply() {
-  const [form, setForm] = useState({ full_name: '', email: '', phone: '', country: '', service: 'Document review and submission', notes: '', fee_ack: false });
-  const [docs, setDocs] = useState([]);
-  const [busy, setBusy] = useState(false);
+const DOCS = [
+  { kind: 'passport', label: 'Passport photo page' },
+  { kind: 'cv', label: 'CV' },
+  { kind: 'certificate', label: 'Highest certificate' },
+];
+
+export default function ApplyPage() {
+  const [form, setForm] = useState({ full_name: '', email: '', phone: '', country: '', service: 'Work placement', notes: '', fee_ack: false });
+  const [files, setFiles] = useState({});
   const [error, setError] = useState('');
-  const [done, setDone] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [ref, setRef] = useState('');
 
   function update(key, value) {
-    setForm((f) => ({ ...f, [key]: value }));
+    setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function readFiles(fileList) {
-    const out = [];
-    for (const file of Array.from(fileList).slice(0, 5)) {
-      if (file.size > 1_500_000) {
-        setError(`${file.name} is larger than 1.5 MB. Please compress it.`);
-        continue;
-      }
-      const dataUrl = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.readAsDataURL(file);
-      });
-      out.push({ kind: file.name.toLowerCase().includes('passport') ? 'passport' : 'document', filename: file.name, dataUrl });
-    }
-    setDocs(out);
+  async function readFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
 
   async function submit(e) {
     e.preventDefault();
     setError('');
-    if (!form.fee_ack) {
-      setError('Please confirm you understand the fee and refund terms.');
-      return;
-    }
     setBusy(true);
     try {
+      const documents = [];
+      for (const doc of DOCS) {
+        const file = files[doc.kind];
+        if (!file) continue;
+        if (file.size > 2 * 1024 * 1024) {
+          setError(`${doc.label} is larger than 2 MB. Please compress it and try again.`);
+          setBusy(false);
+          return;
+        }
+        documents.push({ kind: doc.kind, filename: file.name, data: await readFile(file) });
+      }
+
       const res = await fetch('/api/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, docs }),
+        body: JSON.stringify({ ...form, documents }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Submission failed.');
-      setDone(data.ref);
-      setForm({ full_name: '', email: '', phone: '', country: '', service: 'Document review and submission', notes: '', fee_ack: false });
-      setDocs([]);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Could not submit the application.');
+        return;
+      }
+      setRef(data.ref);
     } catch (err) {
-      setError(String(err.message || err));
+      setError('Could not submit the application. Check your connection and try again.');
     } finally {
       setBusy(false);
     }
   }
 
-  if (done) {
+  if (ref) {
     return (
       <main>
-        <div className="top"><Link className="brand" href="/"><span className="dot">LX</span> LUX PORTAL</Link></div>
+        <SiteHeader />
         <div className="wrap">
           <section>
             <h2>Application received</h2>
-            <p>Your reference is <strong>{done}</strong>. Keep it safe, you will need it with your email to check status.</p>
-            <p className="muted" style={{ marginTop: 10 }}>A confirmation has been sent to your email address.</p>
+            <p>Your reference is <strong className="lime mono">{ref}</strong>. Keep it safe, you need it to track progress.</p>
+            <p className="muted">A confirmation email is on its way. Our staff now review your documents.</p>
+            <div className="actions">
+              <a className="btn btn-solid" href={`/status?ref=${ref}`}>Track this application</a>
+            </div>
           </section>
-          <div className="actions">
-            <Link className="btn btn-solid" href="/status">Check my status</Link>
-            <Link className="btn" href="/">Back to home</Link>
-          </div>
+          <SiteFooter />
         </div>
       </main>
     );
@@ -85,26 +93,32 @@ export default function Apply() {
 
   return (
     <main>
-      <div className="top"><Link className="brand" href="/"><span className="dot">LX</span> LUX PORTAL</Link></div>
+      <SiteHeader />
       <div className="wrap">
         <section>
-          <h2>New application</h2>
+          <h2>Start an application</h2>
           <form onSubmit={submit}>
-            {FIELDS.map(([key, label]) => (
-              <div key={key}>
-                <label htmlFor={key}>{label}</label>
-                <input id={key} value={form[key]} onChange={(e) => update(key, e.target.value)}
-                  required={key !== 'phone'} placeholder={label} />
+            {FIELDS.map((f) => (
+              <div key={f.name}>
+                <label htmlFor={f.name}>{f.label}</label>
+                <input
+                  id={f.name}
+                  type={f.type || 'text'}
+                  placeholder={f.placeholder}
+                  value={form[f.name]}
+                  onChange={(e) => update(f.name, e.target.value)}
+                  required={f.name === 'full_name' || f.name === 'email'}
+                />
               </div>
             ))}
 
             <div>
-              <label htmlFor="service">What do you need help with</label>
+              <label htmlFor="service">What do you need</label>
               <select id="service" value={form.service} onChange={(e) => update('service', e.target.value)}>
-                <option>Document review and submission</option>
-                <option>Study application support</option>
-                <option>Work application support</option>
-                <option>General enquiry</option>
+                <option>Work placement</option>
+                <option>Study application</option>
+                <option>Document check</option>
+                <option>Other</option>
               </select>
             </div>
 
@@ -113,27 +127,37 @@ export default function Apply() {
               <textarea id="notes" value={form.notes} onChange={(e) => update('notes', e.target.value)} />
             </div>
 
-            <div>
-              <label htmlFor="docs">Documents (passport, CV, certificates)</label>
-              <input id="docs" type="file" multiple accept="image/*,application/pdf" onChange={(e) => readFiles(e.target.files)} />
-              <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-                Max 1.5 MB per file for the demo. Files are stored privately and only visible to review staff.
-              </p>
-            </div>
+            {DOCS.map((doc) => (
+              <div key={doc.kind}>
+                <label htmlFor={doc.kind}>{doc.label}</label>
+                <input
+                  id={doc.kind}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => setFiles({ ...files, [doc.kind]: e.target.files?.[0] })}
+                />
+              </div>
+            ))}
 
-            <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', textTransform: 'none', letterSpacing: 0, fontSize: 13.5, color: '#9a9a9a' }}>
-              <input type="checkbox" style={{ width: 18, height: 18, marginTop: 2 }} checked={form.fee_ack}
-                onChange={(e) => update('fee_ack', e.target.checked)} />
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={form.fee_ack}
+                onChange={(e) => update('fee_ack', e.target.checked)}
+              />
               <span>
-                I understand the service fee is only charged after my case is accepted, is shown in my service
-                agreement, and is refundable if the agreed service is not delivered. No visa or job is guaranteed.
+                I have read the fee and refund terms. The service fee is refundable if the agreed service is not
+                delivered, and it is not a payment for a job.
               </span>
             </label>
 
-            {error ? <p className="err">{error}</p> : null}
-            <button className="btn btn-solid" type="submit" disabled={busy}>{busy ? 'Sending...' : 'Submit application'}</button>
+            <button className="btn btn-lime" type="submit" disabled={busy}>
+              {busy ? 'Submitting…' : 'Submit application'}
+            </button>
+            {error && <p className="err">{error}</p>}
           </form>
         </section>
+        <SiteFooter />
       </div>
     </main>
   );
