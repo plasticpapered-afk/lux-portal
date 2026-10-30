@@ -41,6 +41,23 @@ export default function AdminDashboard({ rows, area, mode, onRefresh, onSignOut 
     onRefresh();
   }
 
+  async function remove(row) {
+    const sure = window.confirm(
+      `Delete ${row.full_name} (${row.ref})?\n\nThis permanently removes the application and their scanned documents. This cannot be undone.`
+    );
+    if (!sure) return;
+    setError('');
+    const res = await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', id: row.id }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setError(data.error || 'Delete failed.'); return; }
+    setFlash(`Deleted ${data.deleted}.`);
+    onRefresh();
+  }
+
   async function send(row) {
     setFlash('');
     setError('');
@@ -117,6 +134,9 @@ export default function AdminDashboard({ rows, area, mode, onRefresh, onSignOut 
                         </select>
                         <button className="btn btn-sm btn-ghost" type="button" onClick={() => { setOpen(open === row.id ? null : row.id); }}>
                           Message
+                        </button>
+                        <button className="btn btn-sm btn-danger" type="button" onClick={() => remove(row)}>
+                          Delete
                         </button>
                         {(() => {
                           const doc = (row.documents || [])[0];
