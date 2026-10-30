@@ -87,3 +87,51 @@ th{color:var(--dim);font-weight:500;font-size:11px;text-transform:uppercase;lett
 
 .foot{padding:22px 0 40px;font-size:12px;color:var(--dim);line-height:1.7}
 .foot p{margin-bottom:8px;color:var(--dim);font-size:12px}
+
+/* --- additions: forms, table, panels, floating whatsapp --- */
+.btn-sm{padding:8px 12px;font-size:13px}
+.btn-ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn-ghost:hover{border-color:var(--lime);color:var(--lime)}
+.inp{width:100%;background:#0f0f0f;border:1px solid var(--line);border-radius:10px;color:var(--ink);
+  padding:11px 12px;font-size:14px;font-family:inherit;margin-top:8px}
+.inp:focus{outline:none;border-color:var(--lime)}
+.inp-sm{padding:7px 9px;font-size:13px;margin-top:0}
+select.inp{cursor:pointer}
+.row-btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+textarea.inp{resize:vertical;min-height:90px}
+.panel{border:1px solid var(--lime);border-radius:14px;padding:16px;margin-top:16px;background:#0f1207}
+.panel h3{margin-bottom:6px;font-size:15px}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{text-align:left;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  border-bottom:1px solid var(--line);padding:8px 6px;font-weight:600}
+.tbl td{border-bottom:1px solid #1b1b1b;padding:10px 6px;vertical-align:top}
+.tbl tr:hover td{background:#0e0e0e}
+.status{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;text-transform:capitalize;
+  border:1px solid var(--line);color:var(--dim);white-space:nowrap}
+.status-approved,.status-completed{border-color:var(--lime);color:var(--lime)}
+.status-declined{border-color:#7a2b2b;color:#e58a8a}
+.status-in_review{border-color:#555;color:#ddd}
+.float-wa{position:fixed;right:18px;bottom:18px;width:56px;height:56px;border-radius:50%;
+  background:var(--lime);display:grid;place-items:center;box-shadow:0 10px 30px rgba(0,0,0,.55);z-index:60}
+.float-wa svg{width:28px;height:28px;fill:#0b0b0b}
+.float-wa:hover{transform:translateY(-2px)}
+.hero-big{padding:64px 0 44px;border-bottom:1px solid var(--line);
+  background:radial-gradient(circle at 20% 0%,#16210a,transparent 55%),radial-gradient(circle at 85% 20%,#141414,transparent 60%)}
+.hero-big h1{font-size:clamp(30px,6vw,46px);line-height:1.08;letter-spacing:-.02em;margin:10px 0 14px;max-width:20ch}
+.hero-big .sub{max-width:52ch;color:var(--dim);font-size:16px;line-height:1.6}
+.accent{display:inline-block;width:44px;height:3px;background:var(--lime);margin-bottom:18px}
+.note-lime{border:1px solid var(--lime);border-radius:14px;padding:16px;background:#0f1207}
+.foot-grid{display:grid;gap:18px;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid var(--line);padding:28px 0 40px}
+.foot-grid h4{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
+.foot-grid a{display:block;color:var(--ink);font-size:14px;padding:3px 0}
+.foot-grid a:hover{color:var(--lime)}
+@media(max-width:640px){.foot-grid{grid-template-columns:1fr}}
+
+/* --- document reviewer --- */
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,.78);display:grid;place-items:center;z-index:80;padding:16px}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;width:min(900px,100%);
+  max-height:92vh;display:flex;flex-direction:column;gap:8px}
+.pdf-frame{width:100%;height:70vh;border:1px solid var(--line);border-radius:10px;background:#fff}
+.drop{border:1px dashed #3a3a3a;border-radius:12px;padding:18px;text-align:center;color:var(--dim);font-size:14px}
+.drop.has{border-color:var(--lime);color:var(--lime)}
+.hint{font-size:12px;color:var(--dim);margin-top:6px;line-height:1.5}
