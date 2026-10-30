@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import SiteHeader from '../components/SiteHeader';
 import SiteFooter from '../components/SiteFooter';
+import { FEE_EUR, waLink, WHATSAPP_DISPLAY } from '../lib/config';
 
 export default function Home() {
   return (
@@ -41,9 +42,20 @@ export default function Home() {
 
         <section>
           <h2>Fees and refunds</h2>
-          <div className="note-lime">
+          <div className="fee-box">
+            <div className="kicker" style={{ marginBottom: 0 }}>Service fee</div>
+            <div className="fee-amount">€{FEE_EUR}</div>
+            <p className="muted small">Or the equivalent in your currency. Payable only after your case is approved.</p>
+            <p style={{ marginTop: 10 }}>
+              <a className="btn btn-lime btn-sm" href={waLink('Hello, please send me the payment options for the EUR 162 service fee.')} target="_blank" rel="noreferrer">
+                Get payment options on WhatsApp
+              </a>
+            </p>
+            <p className="muted small" style={{ marginTop: 8 }}>WhatsApp {WHATSAPP_DISPLAY}</p>
+          </div>
+          <div className="note-lime" style={{ marginTop: 12 }}>
             <p>
-              The service fee covers document checking, preparation and submission assistance. It is shown to you in
+              The €{FEE_EUR} service fee covers document checking, preparation and submission assistance. It is shown to you in
               writing before you pay, and it is <span className="lime">refundable</span> if we do not deliver the agreed
               service.
             </p>
