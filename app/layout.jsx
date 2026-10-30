@@ -1,14 +1,18 @@
 import './globals.css';
+import WhatsAppFloat from '../components/WhatsAppFloat';
 
 export const metadata = {
-  title: 'LUX Portal - application and review',
-  description: 'Apply, upload documents, and track your application. Staff back office included.',
+  title: 'LUX Portal - apply, upload and track',
+  description: 'Agency application portal with document upload, staff review and status tracking.',
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <WhatsAppFloat />
+      </body>
     </html>
   );
 }
